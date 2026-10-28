@@ -723,10 +723,12 @@
         poll();
       })
       .catch(function () {
-        // 线上静态托管没有后端，退化为重新加载页面拿最新数据文件
+        // 线上静态托管没有抓取后端（POST 返回 405），提示数据由云端定时更新
         busy = false;
-        setBtn('重新加载…', 'busy');
-        setTimeout(hardReload, 400);
+        setBtn('线上只读 · 云端每日更新', 'ok');
+        btn.title = '线上版本没有抓取后端，数据由 GitHub Actions 每天 21:00 / 23:00 自动更新；'
+                  + '想在本地手动抓取，请运行 ./serve.sh 后访问 http://127.0.0.1:8899';
+        setTimeout(function () { setBtn('刷新数据', ''); }, 3500);
       });
   });
 })();
