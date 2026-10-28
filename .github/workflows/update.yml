@@ -1,0 +1,62 @@
+name: 每日更新数据
+
+on:
+  schedule:
+    # 北京时间 19:00（UTC 11:00）。GitHub 定时任务高峰期可能延迟数分钟至半小时。
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 全部脚本只用标准库（urllib），无需 pip install
+      - name: 抓取并重建数据
+        env:
+          TZ: Asia/Shanghai
+        run: |
+          python scripts/fetch_sse_shares.py
+          python scripts/fetch_sz_quarterly.py
+          python scripts/fetch_snapshot.py
+          python scripts/build_dataset.py
+          python scripts/export_web.py
+
+      - name: 输出本次结果
+        run: |
+          python - <<'PY'
+          import json
+          d = json.load(open('data/dashboard.json'))
+          r = d['rows'][-1]
+          p = d['rows'][-2]
+          print(f"最新交易日 {r['date']}")
+          print(f"头部4只占比 {r['ratio']:.2f}%（前一日 {p['ratio']:.2f}%）")
+          print(f"全部份额 {r['total']:.1f} 亿份（前一日 {p['total']:.1f}）")
+          print(f"生成时间 {d['meta']['generated']}")
+          PY
+
+      - name: 提交变更
+        run: |
+          git config user.name "hs300-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data data.js
+          if git diff --staged --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "data: 更新至 $(date -u +%F)"
+            git push
+          fi

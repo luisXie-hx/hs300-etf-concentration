@@ -1,0 +1,332 @@
+[
+ {
+  "code": "510300",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510310",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510320",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510330",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510350",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510360",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510370",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510380",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "510390",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "512530",
+  "track": "沪深300红利指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515130",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515300",
+  "track": "沪深300红利低波动指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515310",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515330",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515350",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515360",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515380",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515390",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "515660",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "516040",
+  "track": "沪深300自由现金流指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "516830",
+  "track": "沪深300ESG基准指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "517030",
+  "track": "中证沪港深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "517300",
+  "track": "中证沪港深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "560180",
+  "track": "沪深300ESG基准指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "560330",
+  "track": "沪深300价值指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "561000",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "561300",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "list index out of range"
+ },
+ {
+  "code": "561420",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "561690",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "list index out of range"
+ },
+ {
+  "code": "561930",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "561990",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "562070",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "562170",
+  "track": "沪深300自由现金流指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "562310",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "562320",
+  "track": "沪深300价值指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "563520",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "563960",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159919",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "159925",
+  "track": "沪深300指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "159927",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "list index out of range"
+ },
+ {
+  "code": "159933",
+  "track": "沪深300金融地产指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "159948",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159300",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159330",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159393",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159673",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159238",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159510",
+  "track": "中证智选300价值稳健策略指数",
+  "type": "指数型-股票",
+  "scale": ""
+ },
+ {
+  "code": "159523",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159656",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159653",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ },
+ {
+  "code": "159106",
+  "track": "",
+  "type": "",
+  "scale": "",
+  "err": "HTTP Error 514: Frequency Capped"
+ }
+]
