@@ -1,5 +1,8 @@
 # 沪深300ETF 头部集中度监测
 
+> **在线版**：https://luisxie-hx.github.io/hs300-etf-concentration/
+> 手机可直接打开，已适配移动端布局。
+
 追踪「头部 4 只沪深300ETF 份额 ÷ 全部沪深300ETF 份额」的比例，用来观察大额资金（国家队）的进出节奏。
 
 打开 `index.html` 即可查看。
