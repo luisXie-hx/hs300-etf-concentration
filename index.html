@@ -19,12 +19,30 @@
   }
   .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px;overflow-x:hidden}
 
-  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px;position:relative}
   .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--blue);font-weight:600;text-transform:uppercase}
   h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:6px 0 8px}
   .sub{color:var(--ink2);font-size:14px}
   .stamp{font-size:12px;color:var(--ink3);margin-top:10px;display:flex;gap:16px;flex-wrap:wrap}
   .stamp b{color:var(--ink2);font-weight:600}
+
+  .refresh{
+    position:absolute;right:0;top:2px;
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12.5px;padding:7px 14px;border-radius:8px;
+    border:1px solid var(--line);background:#fff;color:var(--ink2);
+    cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .refresh:hover{border-color:#cbd5e1;color:var(--ink);box-shadow:0 1px 3px rgba(15,23,42,.06)}
+  .refresh.busy{background:#eff6ff;border-color:#bfdbfe;color:var(--blue);cursor:wait}
+  .refresh.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+  .refresh.err{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+  .refresh .spin{
+    width:11px;height:11px;border:2px solid currentColor;border-right-color:transparent;
+    border-radius:50%;display:none;animation:sp .7s linear infinite;
+  }
+  .refresh.busy .spin{display:inline-block}
+  @keyframes sp{to{transform:rotate(360deg)}}
 
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
@@ -79,6 +97,7 @@
     h1{font-size:22px}
     .wrap{padding:20px 14px 40px}
     .chart{height:300px}
+    .refresh{position:static;margin-top:12px}
   }
 
   /* ---------- 手机端 ---------- */
@@ -152,6 +171,9 @@
       <span>交易日 <b id="days">—</b></span>
       <span>更新于 <b id="gen">—</b></span>
     </div>
+    <button id="btnRefresh" class="refresh" title="重新抓取最新份额数据">
+      <span class="spin"></span><span id="btnTxt">刷新数据</span>
+    </button>
   </header>
 
   <div class="kpis">
@@ -647,6 +669,65 @@
       chartMain.resize();
       chartStack.resize();
     }, 180);
+  });
+
+  // ---------- 手动刷新 ----------
+  var btn = document.getElementById('btnRefresh');
+  var btnTxt = document.getElementById('btnTxt');
+  var busy = false;
+
+  function setBtn(txt, cls) {
+    btnTxt.textContent = txt;
+    btn.className = 'refresh' + (cls ? ' ' + cls : '');
+  }
+
+  function hardReload() {
+    var u = new URL(location.href);
+    u.searchParams.set('_t', Date.now());
+    location.replace(u.toString());
+  }
+
+  function poll() {
+    fetch('/api/status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        if (s.running) {
+          var el = s.started ? Math.max(0, Math.round(Date.now() / 1000 - s.started)) : 0;
+          setBtn('抓取中 ' + el + 's', 'busy');
+          setTimeout(poll, 1200);
+          return;
+        }
+        busy = false;
+        if (s.ok) {
+          setBtn('已更新 ' + (s.date || ''), 'ok');
+          setTimeout(hardReload, 700);
+        } else {
+          setBtn('抓取失败', 'err');
+          setTimeout(function () { setBtn('刷新数据', ''); }, 4000);
+        }
+      })
+      .catch(function () {
+        busy = false;
+        setBtn('刷新数据', '');
+      });
+  }
+
+  btn.addEventListener('click', function () {
+    if (busy) return;
+    busy = true;
+    setBtn('连接中…', 'busy');
+    fetch('/api/refresh', { method: 'POST' })
+      .then(function (r) {
+        if (r.status === 409) { poll(); return; }
+        if (!r.ok) throw new Error('no-api');
+        poll();
+      })
+      .catch(function () {
+        // 线上静态托管没有后端，退化为重新加载页面拿最新数据文件
+        busy = false;
+        setBtn('重新加载…', 'busy');
+        setTimeout(hardReload, 400);
+      });
   });
 })();
 </script>

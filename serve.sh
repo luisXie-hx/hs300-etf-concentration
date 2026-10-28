@@ -22,7 +22,8 @@ done
 URL="http://$IP:$PORT/index.html"
 
 echo ""
-echo "  手机访问地址： $URL"
+echo "  电脑访问： http://127.0.0.1:$PORT/index.html"
+echo "  手机访问： $URL"
 echo "  （手机需与本机连同一个 WiFi）"
 echo ""
 /Users/luis/.workbuddy-ai/binaries/python/envs/default/bin/python - "$URL" <<'EOF'
@@ -32,6 +33,7 @@ qr.add_data(sys.argv[1]); qr.make()
 qr.print_ascii(invert=True)
 EOF
 echo ""
+echo "  页面右上角「刷新数据」按钮可手动抓取最新数据"
 echo "  按 Ctrl+C 停止服务"
 echo ""
-$PY -m http.server "$PORT" --bind 0.0.0.0
+PORT="$PORT" $PY serve.py
