@@ -50,6 +50,47 @@ cd "/Users/luis/WorkBuddy AI/金融" && ./install-schedule.sh
 
 如果经常在外面看，可以把站点发布到公网，然后把发布步骤追加到 `update.sh` 末尾，每次更新自动同步。需要时告诉我，我来配。
 
+## 部署到 GitHub（免费、7×24 自动更新）
+
+本地仓库已初始化好，推送即可。
+
+**1. 在 GitHub 新建一个仓库**（Public / Private 都行），然后：
+
+```bash
+cd "/Users/luis/WorkBuddy AI/金融"
+git remote add origin git@github.com:<你的用户名>/<仓库名>.git
+git push -u origin main
+```
+
+**2. 打开仓库 Settings → Pages**
+
+- Source 选 **Deploy from a branch**
+- Branch 选 **main**，目录选 **/(root)**，保存
+
+几分钟后访问 `https://<用户名>.github.io/<仓库名>/`。
+
+**3. 之后全自动**
+
+`.github/workflows/update.yml` 每天 **北京时间 19:00** 自动：
+
+```
+抓沪市份额 → 抓深市季报 → 抓当日快照 → 重建数据集 → 提交 data/ 和 data.js → Pages 自动重新发布
+```
+
+也可以在仓库的 **Actions** 页面点 `Run workflow` 手动触发一次，先验证能不能抓到数据。
+
+### 需要注意
+
+- **Actions 用的是境外机房 IP**。跑完看日志里这三行是否正常：
+  - `待抓取 N 天（已跳过 100 个非交易日）`
+  - `DONE days= 1245  empty= 100`
+  - `snapshot 6 只（深市）`
+  
+  如果 `snapshot 0 只` 或 `FAIL`，说明东财对机房 IP 有限流——沪市数据仍会正常更新，深市会退回季报插值，不影响主指标趋势。
+- **GitHub Pages 国内访问不稳定**。想要快且免备案，可以再把这个仓库接到 Cloudflare Pages（免费，自动跟随每次 push 部署）。
+- Actions 定时任务在高峰期可能延迟几分钟到半小时，不影响日频数据。
+- 仓库里 `data/` 约 10MB，随年份增长约每年 +2MB，GitHub 单文件上限 100MB，短期内无需担心。
+
 ## 数据口径
 
 | 市场 | 来源 | 频率 |
