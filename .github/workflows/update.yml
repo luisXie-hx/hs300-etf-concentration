@@ -36,6 +36,8 @@ jobs:
           python scripts/fetch_sse_shares.py
           python scripts/fetch_sz_quarterly.py
           python scripts/fetch_snapshot.py
+          python scripts/fetch_market.py
+          python scripts/build_market.py
           python scripts/build_dataset.py
           python scripts/export_web.py
 
@@ -50,13 +52,19 @@ jobs:
           print(f"头部4只占比 {r['ratio']:.2f}%（前一日 {p['ratio']:.2f}%）")
           print(f"全部份额 {r['total']:.1f} 亿份（前一日 {p['total']:.1f}）")
           print(f"生成时间 {d['meta']['generated']}")
+          try:
+              m = json.load(open('data/market.json'))
+              s = m.get('sentiment') or {}
+              print(f"情绪温度 {s.get('temp')} | 成交额分位 {s.get('turnover_pct')} | 两融分位 {s.get('margin_pct')}")
+          except Exception as e:
+              print(f"情绪数据缺失: {e}")
           PY
 
       - name: 提交变更
         run: |
           git config user.name "hs300-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data data.js
+          git add data data.js market_data.js
           if git diff --staged --quiet; then
             echo "数据无变化，跳过提交"
           else

@@ -61,17 +61,51 @@ def main():
         seg = [x for x in tvals[max(0, i - 19):i + 1] if x]
         r["turnover_ma20"] = round(mean(seg), 1) if len(seg) >= 10 else None
 
-    # 逐日派生指标（供四象限散点使用）
-    tma_hist = []
+    # 逐日派生：波动率、各指标 5 年滚动分位、情绪温度
+    def roll_vol(i):
+        if i < 20:
+            return None
+        seg = [closes[j] / closes[j - 1] - 1 for j in range(i - 19, i + 1)]
+        return round(pstdev(seg) * math.sqrt(252) * 100, 2)
+
+    tma_hist, m_hist, v_hist = [], [], []
     for i, r in enumerate(rows):
+        r["vol20"] = roll_vol(i)
+
         if r["turnover_ma20"]:
             tma_hist.append(r["turnover_ma20"])
             r["tma_pct"] = pct_rank(tma_hist, r["turnover_ma20"])
         else:
             r["tma_pct"] = None
+
+        if r["margin"]:
+            m_hist.append(r["margin"])
+            r["margin_pct"] = pct_rank(m_hist, r["margin"])
+        else:
+            r["margin_pct"] = None
+
+        if r["vol20"]:
+            v_hist.append(r["vol20"])
+            r["vol_pct"] = pct_rank(v_hist, r["vol20"])
+        else:
+            r["vol_pct"] = None
+
         r["ret20"] = round((closes[i] / closes[i - 20] - 1) * 100, 2) if i >= 20 else None
 
-    last = rows[-1]
+        # 情绪温度：量能 40% + 杠杆 30% + 波动 30%（波动反向，越平静越偏热）
+        parts = []
+        if r["tma_pct"] is not None:
+            parts.append((r["tma_pct"], 0.4))
+        if r["margin_pct"] is not None:
+            parts.append((r["margin_pct"], 0.3))
+        if r["vol_pct"] is not None:
+            parts.append((100 - r["vol_pct"], 0.3))
+        if parts:
+            w = sum(p[1] for p in parts)
+            r["temp"] = round(sum(p[0] * p[1] for p in parts) / w, 1)
+        else:
+            r["temp"] = None
+
     # 以"最后一个各指标齐全"的交易日为基准（成交额/两融披露晚于指数）
     idx = max((i for i, r in enumerate(rows)
                if r["turnover"] is not None and r["margin"] is not None),
@@ -154,7 +188,7 @@ def main():
             "generated": raw.get("generated") or "",
             "turnover_src": raw.get("turnover_src"),
             "turnover_days": len([r for r in rows if r["turnover"]]),
-            "note": "成交额数据源受限时仅覆盖近期；两融与指数为完整 5 年。"
+            "note": "指数、两融、成交额均为完整 5 年日频；成交额采用沪市+深市全市场口径。"
         },
         "headline": headline,
         "state": {
@@ -202,7 +236,24 @@ def main():
                 "unit": "%",
                 "pct": vol_pct,
                 "sub": "历史分位 " + (f"{vol_pct:.0f}%" if vol_pct else "—")
+            },
+            "temp": {
+                "label": "情绪温度",
+                "value": last.get("temp"),
+                "unit": "/100",
+                "pct": last.get("temp"),
+                "sub": "量能40% + 杠杆30% + 波动30%"
             }
+        },
+        "sentiment": {
+            "temp": last.get("temp"),
+            "turnover_pct": last.get("tma_pct"),
+            "margin_pct": last.get("margin_pct"),
+            "vol_pct": last.get("vol_pct"),
+            "turnover_ma20": last.get("turnover_ma20"),
+            "turnover": last.get("turnover"),
+            "margin": last.get("margin"),
+            "vol20": last.get("vol20"),
         },
         "rows": rows,
     }

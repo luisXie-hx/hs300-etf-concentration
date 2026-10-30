@@ -87,8 +87,8 @@
 <div class="wrap">
 
   <nav>
-    <a href="index.html">沪深300 集中度</a>
-    <a href="market.html" class="on">大盘状态</a>
+    <a href="index.html">头部集中度</a>
+    <a href="market.html" class="on">大盘情绪</a>
   </nav>
 
   <header>
@@ -131,7 +131,7 @@
     </ul>
 
     <div class="warn">
-      <b>数据说明：</b>指数与两融为完整 5 年日频。成交额因数据源限流，当前仅覆盖近期；分位与四象限基于可用区间计算，样本扩大后结论可能变化。所有判断为统计描述，不构成买卖建议。
+      <b>数据说明：</b>指数、两融、成交额均为完整 5 年日频。成交额采用沪市（上证综指）+ 深市（深证综指）全市场口径，不是沪深300 成分股口径。所有判断为统计描述，不构成买卖建议。
     </div>
   </section>
 
@@ -173,7 +173,7 @@
     return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: d === undefined ? 1 : d });
   }
 
-  var order = ['turnover', 'index', 'drawdown', 'trend', 'margin', 'vol20'];
+  var order = ['turnover', 'index', 'drawdown', 'trend', 'margin', 'vol20', 'temp'];
   var html = '';
   order.forEach(function (k) {
     var c = M.cards[k];

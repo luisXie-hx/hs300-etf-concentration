@@ -10,6 +10,18 @@ idx = json.load(open(os.path.join(DATA, "hs300.json")))
 rows = d["rows"]
 meta = d["meta"]
 
+# 情绪序列（可选：market.json 不存在时前端自动隐藏情绪面板）
+mp = os.path.join(DATA, "market.json")
+mk = {}
+sent = {}
+if os.path.exists(mp):
+    m = json.load(open(mp))
+    mk = {r["date"]: r for r in m.get("rows", [])}
+    sent = m.get("sentiment", {}) or {}
+
+def col(key):
+    return [mk.get(r["date"], {}).get(key) for r in rows]
+
 codes = [x["code"] for x in meta["top4"]] + \
         [x["code"] for x in meta["sh"] if x["code"] not in [y["code"] for y in meta["top4"]]] + \
         [x["code"] for x in meta["sz"] if x["code"] not in [y["code"] for y in meta["top4"]]]
@@ -26,6 +38,15 @@ out = {
     "szTotal": [r["sz_total"] for r in rows],
     "idx": [idx.get(r["date"]) for r in rows],
     "series": {c: [r["per"].get(c) for r in rows] for c in codes},
+    "turnover": col("turnover"),
+    "turnoverMa20": col("turnover_ma20"),
+    "tmaPct": col("tma_pct"),
+    "margin": col("margin"),
+    "marginPct": col("margin_pct"),
+    "vol20": col("vol20"),
+    "volPct": col("vol_pct"),
+    "temp": col("temp"),
+    "sentiment": sent,
     "latest": rows[-1],
     "prev": rows[-2],
 }
@@ -33,3 +54,4 @@ js = "window.DASH=" + json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 open(os.path.join(BASE, "data.js"), "w").write(js)
 print("data.js", len(js), "bytes, days=", len(rows))
 print("codes", len(codes))
+print("情绪序列:", "有" if any(out["turnover"]) else "无", "| 温度", sent.get("temp"))

@@ -77,6 +77,21 @@
   }
   .zoominfo b{color:var(--ink2);font-weight:600}
 
+  nav{display:flex;gap:6px;margin-bottom:18px}
+  nav a{
+    font-size:13px;padding:6px 14px;border-radius:8px;text-decoration:none;
+    color:var(--ink2);border:1px solid var(--line);background:#fff;transition:.15s;
+  }
+  nav a:hover{border-color:#cbd5e1;color:var(--ink)}
+  nav a.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+
+  .sec-label{
+    font-size:12.5px;color:var(--ink3);margin:2px 0 10px;
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  }
+  .sec-label b{color:var(--ink2);font-weight:600;font-size:13px}
+  .sec-label span{font-size:11.5px}
+
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{
     text-align:right;font-weight:600;color:var(--ink3);font-size:11.5px;
@@ -167,6 +182,11 @@
 <body>
 <div class="wrap">
 
+  <nav>
+    <a href="index.html" class="on">头部集中度</a>
+    <a href="market.html">大盘情绪</a>
+  </nav>
+
   <header>
     <div class="eyebrow">Fund Concentration Monitor</div>
     <h1>沪深300ETF 头部集中度</h1>
@@ -204,6 +224,30 @@
     </div>
   </div>
 
+  <div class="sec-label" id="secLabel"><b>市场情绪</b><span>同一时点 · 全部换算成 5 年分位，便于横向比较</span></div>
+  <div class="kpis" id="sentKpis">
+    <div class="kpi">
+      <div class="lab">两市成交额（20日均）</div>
+      <div class="val" id="s1">—</div>
+      <div class="delta" id="s1d">—</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">两融余额</div>
+      <div class="val" id="s2">—</div>
+      <div class="delta" id="s2d">—</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">20日年化波动率</div>
+      <div class="val" id="s3">—</div>
+      <div class="delta" id="s3d">—</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">情绪温度</div>
+      <div class="val" id="s4">—</div>
+      <div class="delta" id="s4d">—</div>
+    </div>
+  </div>
+
   <section class="card" id="summaryCard">
     <h2>一句话结论</h2>
     <div class="cap">基于下方数据自动生成</div>
@@ -212,7 +256,7 @@
 
   <section class="card">
     <h2>占比走势 vs 沪深300指数</h2>
-    <div class="cap">左轴：头部4只份额占比（%）；右轴：沪深300指数收盘。拖动下方滑块或直接框选/滚轮缩放，可选任意区间</div>
+    <div class="cap">上：头部4只份额占比（左轴 %）＋ 沪深300（右轴）；下：两市成交额（柱）＋ 20日均线。两区共用同一滑块</div>
     <div class="toolbar">
       <button class="btn on" data-win="0">全部</button>
       <button class="btn" data-win="750">近三年</button>
@@ -436,6 +480,24 @@
     return { min: +mn.toFixed(4), max: +mx.toFixed(4), peak: hi, low: lo };
   }
 
+  // 成交额副图纵轴（0 起，取整到万亿刻度）
+  function turnFit() {
+    if (!hasSent) return null;
+    var r = visIdx(), vals = [];
+    for (var i = r[0]; i <= r[1]; i++) {
+      if (D.turnover[i] != null) vals.push(D.turnover[i]);
+      if (D.turnoverMa20[i] != null) vals.push(D.turnoverMa20[i]);
+    }
+    if (!vals.length) return null;
+    var mx = Math.max.apply(null, vals);
+    var u = niceUnit(Math.max(mx, 100) / 4, [1, 2, 2.5, 5, 10]);
+    return { min: 0, max: Math.ceil(mx / u) * u };
+  }
+
+  var hasSent = !!(D.turnover && D.turnover.some(function (v) { return v != null; }));
+  var volUnit = '万亿';
+  function volFmt(v) { return volUnit === '万亿' ? (v / 10000).toFixed(1) + '万亿' : v + '亿'; }
+
   function render() {
     var dates = D.dates;
     var ratio = ratioArr();
@@ -444,6 +506,23 @@
 
     var ratioClean = ratio.map(function (v) { return (v === null || isNaN(v)) ? null : v; });
     var fit = yFit(ratio) || { min: 0, max: 100, peak: 100 };
+    var tf = turnFit() || { min: 0, max: 20000 };
+    volUnit = tf.max >= 10000 ? '万亿' : '亿';
+
+    // 双区布局：上区占比，下区成交额
+    var L = mob ? 46 : 68, R = mob ? 46 : 64;
+    var g0Top = mob ? 46 : 30;
+    var g0H = mob ? 158 : 222;
+    var g1Top = g0Top + g0H + (mob ? 26 : 32);
+    var g1H = mob ? 60 : 82;
+    var totalH = hasSent
+      ? g1Top + g1H + (mob ? 62 : 70)
+      : g0Top + g0H + (mob ? 78 : 86);
+    var el = document.getElementById('chartMain');
+    if (el.style.height !== totalH + 'px') {
+      el.style.height = totalH + 'px';
+      chartMain.resize();
+    }
 
     var areas = [];
     var phases = [
@@ -466,23 +545,72 @@
       areas.push([seg, { xAxis: p[1] }]);
     });
 
+    var grids = [{ left: L, right: R, top: g0Top, height: g0H }];
+    if (hasSent) grids.push({ left: L, right: R, top: g1Top, height: g1H });
+
+    var xAxes = [{
+      type: 'category', data: dates, gridIndex: 0, boundaryGap: false,
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisTick: { show: false },
+      axisLabel: hasSent
+        ? { show: false }
+        : { color: '#94a3b8', fontSize: 11, hideOverlap: true, interval: 'auto' }
+    }];
+    if (hasSent) {
+      xAxes.push({
+        type: 'category', data: dates, gridIndex: 1, boundaryGap: false,
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true, interval: 'auto' }
+      });
+    }
+
+    var yAxes = [
+      {
+        type: 'value', gridIndex: 0, min: fit.min, max: fit.max,
+        axisLabel: { color: '#94a3b8', fontSize: 11, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: '#f1f5f9' } }
+      },
+      {
+        type: 'value', gridIndex: 0, scale: true, position: 'right',
+        axisLabel: { color: '#cbd5e1', fontSize: 11 },
+        splitLine: { show: false }
+      }
+    ];
+    if (hasSent) {
+      yAxes.push({
+        type: 'value', gridIndex: 1, min: tf.min, max: tf.max, splitNumber: 2,
+        axisLabel: {
+          color: '#94a3b8', fontSize: 10, formatter: volFmt
+        },
+        splitLine: { lineStyle: { color: '#f8fafc' } }
+      });
+    }
+
     chartMain.setOption({
       animationDuration: 600,
-      grid: { left: mob ? 44 : 68, right: mob ? 44 : 64, top: mob ? 54 : 30, bottom: mob ? 74 : 82 },
+      grid: grids,
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'cross', label: { backgroundColor: '#334155' } },
+        axisPointer: { type: 'cross', link: [{ xAxisIndex: 'all' }], label: { backgroundColor: '#334155' } },
         backgroundColor: 'rgba(255,255,255,.97)',
         borderColor: '#e2e8f0',
         textStyle: { color: '#0f172a', fontSize: 12 },
         formatter: function (ps) {
+          if (!ps || !ps.length) return '';
           var out = '<div style="font-weight:700;margin-bottom:4px">' + ps[0].axisValue + '</div>';
           ps.forEach(function (p) {
-            var unit = p.seriesName.indexOf('指数') >= 0 ? '' : '%';
+            if (p.value === null || p.value === undefined) return;
+            var txt;
+            if (p.seriesName.indexOf('成交额') >= 0) {
+              txt = Math.round(p.value).toLocaleString('zh-CN') + ' 亿';
+            } else if (p.seriesName.indexOf('指数') >= 0) {
+              txt = Number(p.value).toFixed(2);
+            } else {
+              txt = Number(p.value).toFixed(2) + '%';
+            }
             out += '<div style="display:flex;justify-content:space-between;gap:18px">' +
-              '<span>' + p.marker + p.seriesName + '</span><b>' +
-              (p.value === null || p.value === undefined ? '—' : Number(p.value).toFixed(2)) +
-              unit + '</b></div>';
+              '<span>' + p.marker + p.seriesName + '</span><b>' + txt + '</b></div>';
           });
           return out;
         }
@@ -493,19 +621,14 @@
         itemGap: mob ? 10 : 16,
         textStyle: { fontSize: mob ? 10.5 : 11.5, color: '#64748b' }
       },
-      xAxis: {
-        type: 'category', data: dates, boundaryGap: false,
-        axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true, interval: 'auto' },
-        axisTick: { show: false }
-      },
+      xAxis: xAxes,
       dataZoom: [
         {
-          type: 'inside', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+          type: 'inside', xAxisIndex: hasSent ? [0, 1] : 0, start: zoom.start, end: zoom.end,
           minValueSpan: 15, zoomOnMouseWheel: true, moveOnMouseMove: true
         },
         {
-          type: 'slider', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+          type: 'slider', xAxisIndex: hasSent ? [0, 1] : 0, start: zoom.start, end: zoom.end,
           height: mob ? 20 : 26, bottom: mob ? 6 : 10,
           borderColor: 'transparent',
           backgroundColor: '#f8fafc',
@@ -521,18 +644,7 @@
           brushSelect: false
         }
       ],
-      yAxis: [
-        {
-          type: 'value', min: fit.min, max: fit.max,
-          axisLabel: { color: '#94a3b8', fontSize: 11, formatter: '{value}%' },
-          splitLine: { lineStyle: { color: '#f1f5f9' } }
-        },
-        {
-          type: 'value', scale: true,
-          axisLabel: { color: '#cbd5e1', fontSize: 11 },
-          splitLine: { show: false }
-        }
-      ],
+      yAxis: yAxes,
       series: [
         {
           name: '头部4只份额占比', type: 'line', data: ratioClean,
@@ -563,7 +675,18 @@
           lineStyle: { width: 1.2, color: '#cbd5e1', opacity: .85 },
           itemStyle: { color: '#cbd5e1' }
         }
-      ]
+      ].concat(hasSent ? [
+        {
+          name: '两市成交额', type: 'bar', xAxisIndex: 1, yAxisIndex: 2, data: D.turnover,
+          barWidth: '62%', itemStyle: { color: '#cbd5e1' },
+          emphasis: { itemStyle: { color: '#94a3b8' } }
+        },
+        {
+          name: '成交额20日均', type: 'line', xAxisIndex: 1, yAxisIndex: 2, data: D.turnoverMa20,
+          smooth: 0.2, symbol: 'none',
+          lineStyle: { width: 1.5, color: '#d97706' }, itemStyle: { color: '#d97706' }
+        }
+      ] : [])
     }, true);
   }
 
@@ -668,6 +791,44 @@
     }, true);
   }
 
+  // ---- 情绪面板 ----
+  function renderSentiment() {
+    var secLbl = document.getElementById('secLabel');
+    var wrap = document.getElementById('sentKpis');
+    if (!hasSent) {
+      if (wrap) wrap.style.display = 'none';
+      if (secLbl) secLbl.style.display = 'none';
+      return;
+    }
+    var g = function (id) { return document.getElementById(id); };
+    var pctTxt = function (v) { return (v === null || v === undefined) ? '—' : Math.round(v) + '%'; };
+
+    var ma = D.turnoverMa20[last], t = D.turnover[last];
+    g('s1').innerHTML = (ma != null ? (ma / 10000).toFixed(2) : '—') + '<small>万亿</small>';
+    g('s1d').innerHTML = '5年分位 <b>' + pctTxt(D.tmaPct[last]) + '</b>　当日 ' +
+      (t != null ? num(t) : '—') + ' 亿';
+
+    var m = D.margin[last], m5 = D.margin[Math.max(0, last - 5)];
+    g('s2').innerHTML = (m != null ? (m / 10000).toFixed(2) : '—') + '<small>万亿</small>';
+    g('s2d').innerHTML = '5年分位 <b>' + pctTxt(D.marginPct[last]) + '</b>' +
+      (m != null && m5 != null
+        ? '　5日 <span class="' + (m - m5 >= 0 ? 'up' : 'down') + '">' +
+          (m - m5 >= 0 ? '+' : '') + num(m - m5) + ' 亿</span>'
+        : '');
+
+    var v = D.vol20[last];
+    g('s3').innerHTML = (v != null ? v.toFixed(1) : '—') + '<small>%</small>';
+    g('s3d').innerHTML = '5年分位 <b>' + pctTxt(D.volPct[last]) + '</b>　越高越恐慌';
+
+    var temp = D.temp[last];
+    var tone = temp == null ? '' : (temp >= 70 ? 'up' : temp <= 30 ? 'down' : '');
+    g('s4').innerHTML = '<span class="' + tone + '">' + (temp != null ? temp.toFixed(0) : '—') +
+      '</span><small>/100</small>';
+    g('s4d').innerHTML = temp == null ? '—' :
+      (temp >= 70 ? '偏热：量能或杠杆处于高位' :
+       temp <= 30 ? '偏冷：量能萎缩、杠杆收缩' : '中性：无极端读数');
+  }
+
   // ---- 表格 ----
   function renderTable() {
     var rows = [];
@@ -736,8 +897,12 @@
   function refreshAxes() {
     var fit = yFit(ratioArr());
     if (!fit) return;
+    var tf = turnFit();
+    if (tf) { volUnit = tf.max >= 10000 ? '万亿' : '亿'; }
+    var yOpt = [{ min: fit.min, max: fit.max }];
+    if (tf) { yOpt.push({}, { min: tf.min, max: tf.max }); }
     chartMain.setOption({
-      yAxis: [{ min: fit.min, max: fit.max }],
+      yAxis: yOpt,
       series: [{ markLine: {
         label: { formatter: '区间峰值 ' + fit.peak.toFixed(2) + '%' },
         data: [{ yAxis: fit.peak }]
@@ -838,6 +1003,7 @@
   renderStack();
   renderTable();
   renderSummary();
+  renderSentiment();
   updateZoomInfo();
 
   var rt = null;

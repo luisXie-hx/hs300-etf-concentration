@@ -3,10 +3,15 @@
 
 数据源：
 - 指数日线：腾讯（稳定，一次可取 5 年）
-- 成交额：东财 K 线（含成交额字段）→ 失败时回退同花顺
+- 成交额：东财 K 线 f57（上证综指 1.000001 + 深证综指 0.399106，均为全市场口径）
+         → 失败时回退同花顺（仅近期数据）
 - 两融余额：东财 datacenter RPTA_RZRQ_LSHJ（全市场合计）
+
+注意：东财指数 K 线的 f57 对沪市综指/深市综指返回的是该交易所全部股票成交额，
+而沪深300 等成分指数返回的只是成分股成交额，两者不能混用。
 """
 import json, os, re, time, sys
+import datetime as dt
 import urllib.request
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -54,7 +59,7 @@ def fetch_em_turnover(secid):
     u = ("https://push2his.eastmoney.com/api/qt/stock/kline/get?"
          f"secid={secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f53,f57"
          "&klt=101&fqt=0&beg=20210901&end=20500101")
-    raw = _get(u, {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/"}, timeout=25, retry=2)
+    raw = _get(u, {"User-Agent": UA, "Referer": "https://quote.eastmoney.com/"}, timeout=25, retry=3)
     if not raw:
         return None
     try:
@@ -64,7 +69,10 @@ def fetch_em_turnover(secid):
     out = {}
     for k in d:
         p = k.split(",")
-        out[p[0]] = float(p[2])
+        try:
+            out[p[0]] = float(p[2])
+        except (ValueError, IndexError):
+            continue
     return out or None
 
 
@@ -130,9 +138,9 @@ def main():
             print(f"指数 {name}: FAIL")
         time.sleep(0.5)
 
-    # 成交额：上证 + 深证
-    sse_turn = fetch_em_turnover("1.000001")
-    szse_turn = fetch_em_turnover("0.399001")
+    # 成交额：沪市 + 深市全市场口径
+    sse_turn = fetch_em_turnover("1.000001")   # 上证综指
+    szse_turn = fetch_em_turnover("0.399106")  # 深证综指
     src = "eastmoney"
     if not sse_turn or not szse_turn:
         print("东财成交额不可用，回退同花顺")
@@ -141,7 +149,15 @@ def main():
         src = "ths"
     if sse_turn and szse_turn:
         days = sorted(set(sse_turn) & set(szse_turn))
-        res["turnover"] = {d: sse_turn[d] + szse_turn[d] for d in days}
+        turn = {d: sse_turn[d] + szse_turn[d] for d in days}
+        # 当日未收盘的 K 线是盘中数据，不能写进历史序列
+        now = dt.datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        if turn.get(today) and (now.hour, now.minute) < (15, 5):
+            turn.pop(today)
+            days = [d for d in days if d != today]
+            print(f"  剔除当日未收盘数据 {today}")
+        res["turnover"] = turn
         res["turnover_src"] = src
         print(f"两市成交额({src}): {len(days)} 天  {days[0]} ~ {days[-1]}")
     else:
