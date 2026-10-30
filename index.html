@@ -71,6 +71,11 @@
     background:var(--blue) !important;border-color:var(--blue) !important;
     color:#fff !important;font-weight:600;
   }
+  .zoominfo{
+    margin-left:auto;align-self:center;font-size:12px;color:var(--ink3);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .zoominfo b{color:var(--ink2);font-weight:600}
 
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{
@@ -188,7 +193,7 @@
       <div class="delta" id="k2d">—</div>
     </div>
     <div class="kpi">
-      <div class="lab">区间峰值 / 低点</div>
+      <div class="lab">所选区间 峰值 / 低点</div>
       <div class="val" id="k3">—</div>
       <div class="delta" id="k3d">—</div>
     </div>
@@ -207,11 +212,15 @@
 
   <section class="card">
     <h2>占比走势 vs 沪深300指数</h2>
-    <div class="cap">左轴：头部4只份额占比（%）；右轴：沪深300指数收盘。绿色区为资金流入阶段，红色区为赎回阶段</div>
+    <div class="cap">左轴：头部4只份额占比（%）；右轴：沪深300指数收盘。拖动下方滑块或直接框选/滚轮缩放，可选任意区间</div>
     <div class="toolbar">
-      <button class="btn on" data-range="all">近五年</button>
-      <button class="btn" data-range="2y">近两年</button>
-      <button class="btn" data-range="1y">近一年</button>
+      <button class="btn on" data-win="0">全部</button>
+      <button class="btn" data-win="750">近三年</button>
+      <button class="btn" data-win="250">近一年</button>
+      <button class="btn" data-win="60">近三月</button>
+      <span class="zoominfo" id="zoomInfo">—</span>
+    </div>
+    <div class="toolbar" style="margin-top:-6px">
       <button class="btn" data-caliber="all">全市场口径</button>
       <button class="btn" data-caliber="sh">仅沪市口径</button>
     </div>
@@ -388,28 +397,53 @@
   var chartStack = echarts.init(document.getElementById('chartStack'));
 
   var caliber = 'all';
-  var rangeKey = 'all';
+  // 当前可视窗口，用百分比表示（0~100），由 dataZoom 滑块驱动
+  var zoom = { start: 0, end: 100 };
+  var syncing = false;
 
-  function slice(arr, start) { return arr.slice(start); }
+  function ratioArr() { return caliber === 'sh' ? D.ratioSh : D.ratio; }
 
-  function startIndex() {
-    if (rangeKey === 'all') return 0;
-    var days = rangeKey === '2y' ? 500 : rangeKey === '1y' ? 250 : 125;
-    return Math.max(0, N - days);
+  // 当前窗口对应的首尾索引
+  function visIdx() {
+    var i0 = Math.max(0, Math.floor(zoom.start / 100 * (N - 1)));
+    var i1 = Math.min(N - 1, Math.ceil(zoom.end / 100 * (N - 1)));
+    if (i1 <= i0) i1 = Math.min(N - 1, i0 + 1);
+    return [i0, i1];
+  }
+
+  // 取整步长，让坐标轴刻度落在整齐数字上
+  function niceUnit(raw, ladder) {
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var n = raw / mag;
+    var L = ladder || [1, 2, 2.5, 5, 10];
+    for (var i = 0; i < L.length; i++) { if (n <= L[i]) return L[i] * mag; }
+    return 10 * mag;
+  }
+
+  // 按当前窗口自适应纵轴
+  function yFit(arr) {
+    var r = visIdx(), vals = [];
+    for (var i = r[0]; i <= r[1]; i++) {
+      var v = arr[i];
+      if (v !== null && v !== undefined && !isNaN(v)) vals.push(v);
+    }
+    if (!vals.length) return null;
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    var u = niceUnit(Math.max(hi - lo, 0.5) / 5);
+    var mn = Math.floor(lo / u) * u;
+    var mx = Math.ceil(hi / u) * u;
+    if (mx - mn < u * 2) { mx = mn + u * 2; }
+    return { min: +mn.toFixed(4), max: +mx.toFixed(4), peak: hi, low: lo };
   }
 
   function render() {
-    var s = startIndex();
-    var dates = slice(D.dates, s);
-    var ratio = caliber === 'sh' ? slice(D.ratioSh, s) : slice(D.ratio, s);
-    var idx = slice(D.idx, s);
+    var dates = D.dates;
+    var ratio = ratioArr();
+    var idx = D.idx;
     var mob = window.innerWidth < 640;
 
     var ratioClean = ratio.map(function (v) { return (v === null || isNaN(v)) ? null : v; });
-    var vals = ratioClean.filter(function (v) { return v !== null; });
-    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
-    var pad = Math.max(1.2, (hi - lo) * 0.13);
-    var peakVal = Math.max.apply(null, vals);
+    var fit = yFit(ratio) || { min: 0, max: 100, peak: 100 };
 
     var areas = [];
     var phases = [
@@ -425,8 +459,8 @@
       };
       if (p[3]) {
         seg.label = {
-          show: true, position: 'insideTop', distance: 8,
-          formatter: p[3], color: p[4], fontSize: mob ? 10 : 11, fontWeight: 600
+          show: !mob, position: 'insideTop', distance: 8,
+          formatter: p[3], color: p[4], fontSize: 11, fontWeight: 600
         };
       }
       areas.push([seg, { xAxis: p[1] }]);
@@ -434,7 +468,7 @@
 
     chartMain.setOption({
       animationDuration: 600,
-      grid: { left: mob ? 44 : 68, right: mob ? 44 : 64, top: mob ? 54 : 30, bottom: mob ? 44 : 56 },
+      grid: { left: mob ? 44 : 68, right: mob ? 44 : 64, top: mob ? 54 : 30, bottom: mob ? 74 : 82 },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross', label: { backgroundColor: '#334155' } },
@@ -462,15 +496,34 @@
       xAxis: {
         type: 'category', data: dates, boundaryGap: false,
         axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: {
-          color: '#94a3b8', fontSize: 11, hideOverlap: true,
-          interval: mob ? 'auto' : Math.max(0, Math.ceil(dates.length / 8) - 1)
-        },
+        axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true, interval: 'auto' },
         axisTick: { show: false }
       },
+      dataZoom: [
+        {
+          type: 'inside', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+          minValueSpan: 15, zoomOnMouseWheel: true, moveOnMouseMove: true
+        },
+        {
+          type: 'slider', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+          height: mob ? 20 : 26, bottom: mob ? 6 : 10,
+          borderColor: 'transparent',
+          backgroundColor: '#f8fafc',
+          fillerColor: 'rgba(29,78,216,.12)',
+          handleStyle: { color: '#fff', borderColor: '#64748b', borderWidth: 1.2 },
+          handleSize: mob ? '110%' : '120%',
+          moveHandleStyle: { color: '#cbd5e1' },
+          moveHandleSize: mob ? 4 : 6,
+          dataBackground: { lineStyle: { color: '#cbd5e1', width: 1 }, areaStyle: { color: '#eef2f7' } },
+          selectedDataBackground: { lineStyle: { color: '#93c5fd', width: 1 }, areaStyle: { color: 'rgba(59,130,246,.18)' } },
+          textStyle: { color: '#94a3b8', fontSize: 10 },
+          labelFormatter: function (i, s) { return typeof s === 'string' ? s.slice(2) : s; },
+          brushSelect: false
+        }
+      ],
       yAxis: [
         {
-          type: 'value', min: Math.floor(lo - pad), max: Math.ceil(hi + pad),
+          type: 'value', min: fit.min, max: fit.max,
           axisLabel: { color: '#94a3b8', fontSize: 11, formatter: '{value}%' },
           splitLine: { lineStyle: { color: '#f1f5f9' } }
         },
@@ -496,11 +549,11 @@
             silent: true, symbol: 'none',
             lineStyle: { color: '#f59e0b', type: 'dashed', width: 1 },
             label: {
-              formatter: '峰值 ' + peakVal.toFixed(2) + '%',
+              formatter: '区间峰值 ' + fit.peak.toFixed(2) + '%',
               color: '#b45309', fontSize: mob ? 9.5 : 11,
               position: mob ? 'insideStartBottom' : 'insideStartTop'
             },
-            data: [{ yAxis: peakVal }]
+            data: [{ yAxis: fit.peak }]
           },
           markArea: { silent: true, data: areas }
         },
@@ -515,9 +568,22 @@
   }
 
   // ---- 堆叠图 ----
+  function stackFit() {
+    var r = visIdx(), mx = 0;
+    for (var i = r[0]; i <= r[1]; i++) {
+      var s = 0;
+      Object.keys(D.series).forEach(function (c) {
+        var v = D.series[c][i];
+        if (v != null) s += v;
+      });
+      if (s > mx) mx = s;
+    }
+    var u = niceUnit(Math.max(mx, 10) / 5, [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]);
+    return Math.ceil(mx / u) * u || 100;
+  }
+
   function renderStack() {
-    var s0 = startIndex();
-    var dts = D.dates.slice(s0);
+    var dts = D.dates;
     var mob = window.innerWidth < 640;
     var top4Codes = D.meta.top4.map(function (x) { return x.code; });
     var colors = ['#1d4ed8', '#38bdf8', '#0d9488', '#f59e0b'];
@@ -525,13 +591,13 @@
     top4Codes.forEach(function (c, i) {
       var nm = D.meta.top4[i].name.replace('沪深300ETF', '');
       series.push({
-        name: nm + ' ' + c, type: 'line', stack: 'x', data: D.series[c].slice(s0),
+        name: nm + ' ' + c, type: 'line', stack: 'x', data: D.series[c],
         smooth: 0.2, symbol: 'none', lineStyle: { width: 0 },
         areaStyle: { color: colors[i], opacity: 0.92 }, itemStyle: { color: colors[i] }
       });
     });
     var others = [];
-    for (var k = s0; k < N; k++) {
+    for (var k = 0; k < N; k++) {
       var rest = 0;
       Object.keys(D.series).forEach(function (c) {
         if (top4Codes.indexOf(c) < 0 && D.series[c][k] != null) rest += D.series[c][k];
@@ -546,7 +612,7 @@
 
     chartStack.setOption({
       animationDuration: 600,
-      grid: { left: mob ? 46 : 68, right: mob ? 12 : 20, top: mob ? 46 : 34, bottom: mob ? 38 : 46 },
+      grid: { left: mob ? 46 : 68, right: mob ? 12 : 20, top: mob ? 46 : 34, bottom: mob ? 66 : 74 },
       tooltip: {
         trigger: 'axis',
         backgroundColor: 'rgba(255,255,255,.97)', borderColor: '#e2e8f0',
@@ -573,14 +639,28 @@
       xAxis: {
         type: 'category', data: dts, boundaryGap: false,
         axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: {
-          color: '#94a3b8', fontSize: 11, hideOverlap: true,
-          interval: mob ? 'auto' : Math.max(0, Math.ceil(dts.length / 8) - 1)
-        },
+        axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true, interval: 'auto' },
         axisTick: { show: false }
       },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, start: zoom.start, end: zoom.end, minValueSpan: 15 },
+        {
+          type: 'slider', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+          height: mob ? 14 : 18, bottom: mob ? 6 : 12,
+          borderColor: 'transparent', backgroundColor: '#f8fafc',
+          fillerColor: 'rgba(29,78,216,.10)',
+          handleStyle: { color: '#fff', borderColor: '#94a3b8', borderWidth: 1 },
+          moveHandleStyle: { color: '#cbd5e1' },
+          moveHandleSize: mob ? 3 : 5,
+          dataBackground: { lineStyle: { color: '#cbd5e1', width: 1 }, areaStyle: { color: '#eef2f7' } },
+          selectedDataBackground: { lineStyle: { color: '#93c5fd', width: 1 }, areaStyle: { color: 'rgba(59,130,246,.16)' } },
+          textStyle: { color: '#94a3b8', fontSize: 10 },
+          labelFormatter: function (i, s) { return typeof s === 'string' ? s.slice(2) : s; },
+          brushSelect: false
+        }
+      ],
       yAxis: {
-        type: 'value',
+        type: 'value', max: stackFit(),
         axisLabel: { color: '#94a3b8', fontSize: 11 },
         splitLine: { lineStyle: { color: '#f1f5f9' } }
       },
@@ -629,21 +709,118 @@
       '截至 ' + D.dates[last] + '　全部沪深300ETF 合计 ' + num(D.total[last]) + ' 亿份　共 ' + rows.length + ' 只';
   }
 
+  // ---- 区间联动 ----
+  function updateZoomInfo() {
+    var r = visIdx();
+    var el = document.getElementById('zoomInfo');
+    if (el) {
+      el.innerHTML = '<b>' + D.dates[r[0]] + '</b> ~ <b>' + D.dates[r[1]] + '</b>　' +
+        (r[1] - r[0] + 1) + ' 个交易日';
+    }
+    var fit = yFit(ratioArr());
+    if (fit) {
+      var rLo = r[0], rHi = r[0];
+      for (var i = r[0]; i <= r[1]; i++) {
+        var v = ratioArr()[i];
+        if (v == null) continue;
+        if (v > ratioArr()[rHi]) rHi = i;
+        if (v < ratioArr()[rLo]) rLo = i;
+      }
+      document.getElementById('k3').innerHTML = fmt(fit.peak, 1) + '<small>%</small>';
+      document.getElementById('k3d').innerHTML =
+        '峰值 ' + D.dates[rHi] + '　低点 ' + fmt(fit.low, 1) + '%（' + D.dates[rLo] + '）';
+    }
+  }
+
+  // 拖动滑块后重算两条图的纵轴范围
+  function refreshAxes() {
+    var fit = yFit(ratioArr());
+    if (!fit) return;
+    chartMain.setOption({
+      yAxis: [{ min: fit.min, max: fit.max }],
+      series: [{ markLine: {
+        label: { formatter: '区间峰值 ' + fit.peak.toFixed(2) + '%' },
+        data: [{ yAxis: fit.peak }]
+      } }]
+    });
+    chartStack.setOption({ yAxis: { max: stackFit() } });
+  }
+
+  function applyZoom(start, end, silent) {
+    zoom = { start: start, end: end };
+    syncing = true;
+    chartMain.dispatchAction({ type: 'dataZoom', start: start, end: end });
+    chartStack.dispatchAction({ type: 'dataZoom', start: start, end: end });
+    syncing = false;
+    if (!silent) { refreshAxes(); updateZoomInfo(); }
+  }
+
+  chartMain.on('dataZoom', function () {
+    if (syncing) return;
+    var dz = chartMain.getOption().dataZoom[0];
+    if (!dz) return;
+    zoom = { start: dz.start, end: dz.end };
+    syncing = true;
+    chartStack.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    syncing = false;
+    refreshAxes();
+    updateZoomInfo();
+    markWin();
+  });
+
+  chartStack.on('dataZoom', function () {
+    if (syncing) return;
+    var dz = chartStack.getOption().dataZoom[0];
+    if (!dz) return;
+    zoom = { start: dz.start, end: dz.end };
+    syncing = true;
+    chartMain.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    syncing = false;
+    refreshAxes();
+    updateZoomInfo();
+    markWin();
+  });
+
+  // 手动拖动后同步高亮预设按钮（不匹配任何预设则全部熄灭）
+  function markWin() {
+    var r = visIdx();
+    var days = r[1] - r[0] + 1;
+    var hit = 0;
+    if (days >= N - 2) hit = 0;
+    else {
+      var cands = [750, 250, 60];
+      hit = -1;
+      for (var i = 0; i < cands.length; i++) {
+        if (Math.abs(days - cands[i]) <= Math.max(3, cands[i] * 0.06)) { hit = cands[i]; break; }
+      }
+    }
+    curWin = hit;
+    document.querySelectorAll('[data-win]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.win === String(curWin));
+    });
+  }
+
   function syncBtns() {
-    document.querySelectorAll('[data-range]').forEach(function (b) {
-      b.classList.toggle('on', b.dataset.range === rangeKey);
+    document.querySelectorAll('[data-win]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.win === String(curWin));
     });
     document.querySelectorAll('[data-caliber]').forEach(function (b) {
       b.classList.toggle('on', b.dataset.caliber === caliber);
     });
   }
 
-  document.querySelectorAll('[data-range]').forEach(function (b) {
+  var curWin = 0;
+
+  document.querySelectorAll('[data-win]').forEach(function (b) {
     b.addEventListener('click', function () {
-      rangeKey = b.dataset.range;
+      curWin = Number(b.dataset.win);
+      var days = curWin;
+      if (!days || days >= N) { applyZoom(0, 100); }
+      else {
+        var i0 = Math.max(0, N - days);
+        applyZoom(i0 / (N - 1) * 100, 100);
+      }
       syncBtns();
-      render();
-      renderStack();
     });
   });
   document.querySelectorAll('[data-caliber]').forEach(function (b) {
@@ -651,6 +828,8 @@
       caliber = b.dataset.caliber;
       syncBtns();
       render();
+      refreshAxes();
+      updateZoomInfo();
     });
   });
 
@@ -659,6 +838,7 @@
   renderStack();
   renderTable();
   renderSummary();
+  updateZoomInfo();
 
   var rt = null;
   window.addEventListener('resize', function () {
