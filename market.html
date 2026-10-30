@@ -26,6 +26,22 @@
   }
   nav a.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
 
+  .toolbar{display:flex;gap:6px;margin:10px 0 8px;flex-wrap:wrap;align-items:center}
+  .btn{
+    font-size:12.5px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);
+    background:#fff;color:var(--ink2);cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .btn:hover{border-color:#cbd5e1;color:var(--ink)}
+  .btn.on,.btn.on:hover{
+    background:var(--blue) !important;border-color:var(--blue) !important;
+    color:#fff !important;font-weight:600;
+  }
+  .zoominfo{
+    margin-left:auto;font-size:12px;color:var(--ink3);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .zoominfo b{color:var(--ink2);font-weight:600}
+
   header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:20px}
   .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--blue);font-weight:600;text-transform:uppercase}
   h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:6px 0 10px}
@@ -105,7 +121,14 @@
 
   <section class="card">
     <h2>成交额 vs 沪深300</h2>
-    <div class="cap">柱：两市日成交额（亿元）；线：沪深300收盘。量能是判断行情持续性的第一手证据</div>
+    <div class="cap">柱：两市日成交额（亿元）；线：沪深300收盘。拖动下方滑块可选任意区间，默认近 20 个交易日</div>
+    <div class="toolbar">
+      <button class="btn on" data-w="20">近20日</button>
+      <button class="btn" data-w="60">近三月</button>
+      <button class="btn" data-w="250">近一年</button>
+      <button class="btn" data-w="0">全部</button>
+      <span class="zoominfo" id="mkInfo">—</span>
+    </div>
     <div id="chartTurnover" class="chart"></div>
   </section>
 
@@ -198,10 +221,43 @@
   var cl = rows.map(function (r) { return r.close; });
   var tma = rows.map(function (r) { return r.turnover_ma20; });
 
+  // 区间缩放：默认近 20 个交易日
+  var WIN = 20;
+  var zoom = { start: Math.max(0, (N - WIN) / Math.max(N - 1, 1) * 100), end: 100 };
+  var syncing = false;
+
+  function visRange() {
+    var i0 = Math.max(0, Math.floor(zoom.start / 100 * (N - 1)));
+    var i1 = Math.min(N - 1, Math.ceil(zoom.end / 100 * (N - 1)));
+    if (i1 <= i0) i1 = Math.min(N - 1, i0 + 1);
+    return [i0, i1];
+  }
+
+  function niceStep(raw) {
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var n = raw / mag;
+    var L = [1, 2, 2.5, 5, 10];
+    for (var i = 0; i < L.length; i++) { if (n <= L[i]) return L[i] * mag; }
+    return 10 * mag;
+  }
+
+  function fitArr(arr, fromZero) {
+    var r = visRange(), v = [];
+    for (var i = r[0]; i <= r[1]; i++) { if (arr[i] != null) v.push(arr[i]); }
+    if (!v.length) return null;
+    var lo = Math.min.apply(null, v), hi = Math.max.apply(null, v);
+    var u = niceStep(Math.max(hi - lo, 1) / 4);
+    var mn = fromZero ? 0 : Math.floor(lo / u) * u;
+    var mx = Math.ceil(hi / u) * u;
+    if (mx - mn < u) { mx = mn + u; }
+    return { min: mn, max: mx };
+  }
+
   c1.setOption({
-    grid: { left: mob ? 48 : 66, right: mob ? 48 : 66, top: 34, bottom: 50 },
+    grid: { left: mob ? 48 : 66, right: mob ? 48 : 66, top: 34, bottom: mob ? 66 : 76 },
     tooltip: {
       trigger: 'axis',
+      axisPointer: { link: [{ xAxisIndex: 'all' }] },
       backgroundColor: 'rgba(255,255,255,.97)', borderColor: '#e2e8f0',
       textStyle: { color: '#0f172a', fontSize: 12 }
     },
@@ -212,16 +268,33 @@
     xAxis: {
       type: 'category', data: dates, boundaryGap: true,
       axisLine: { lineStyle: { color: '#e2e8f0' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10.5, hideOverlap: true, interval: mob ? 'auto' : Math.ceil(N / 8) - 1 },
+      axisLabel: { color: '#94a3b8', fontSize: 10.5, hideOverlap: true, interval: 'auto' },
       axisTick: { show: false }
     },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, start: zoom.start, end: zoom.end, minValueSpan: 5 },
+      {
+        type: 'slider', xAxisIndex: 0, start: zoom.start, end: zoom.end,
+        height: mob ? 18 : 22, bottom: mob ? 6 : 10,
+        borderColor: 'transparent', backgroundColor: '#f8fafc',
+        fillerColor: 'rgba(29,78,216,.12)',
+        handleStyle: { color: '#fff', borderColor: '#64748b', borderWidth: 1.2 },
+        handleSize: '120%', moveHandleStyle: { color: '#cbd5e1' },
+        moveHandleSize: mob ? 4 : 6,
+        dataBackground: { lineStyle: { color: '#cbd5e1', width: 1 }, areaStyle: { color: '#eef2f7' } },
+        selectedDataBackground: { lineStyle: { color: '#93c5fd', width: 1 }, areaStyle: { color: 'rgba(59,130,246,.18)' } },
+        textStyle: { color: '#94a3b8', fontSize: 10 },
+        labelFormatter: function (i, s) { return typeof s === 'string' ? s.slice(2) : s; },
+        brushSelect: false
+      }
+    ],
     yAxis: [
       { type: 'value', name: '亿元', nameTextStyle: { color: '#cbd5e1', fontSize: 10 },
         axisLabel: { color: '#94a3b8', fontSize: 10.5 }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
       { type: 'value', scale: true, axisLabel: { color: '#cbd5e1', fontSize: 10.5 }, splitLine: { show: false } }
     ],
     series: [
-      { name: '日成交额', type: 'bar', data: tv, itemStyle: { color: 'rgba(59,130,246,.45)' }, barMaxWidth: 8 },
+      { name: '日成交额', type: 'bar', data: tv, itemStyle: { color: 'rgba(59,130,246,.45)' }, barMaxWidth: 22 },
       { name: '20日均', type: 'line', data: tma, symbol: 'none', smooth: 0.2,
         lineStyle: { width: 1.8, color: '#1d4ed8' }, itemStyle: { color: '#1d4ed8' } },
       { name: '沪深300', type: 'line', yAxisIndex: 1, data: cl, symbol: 'none', smooth: 0.2,
@@ -288,9 +361,12 @@
     xAxis: {
       type: 'category', data: dates, boundaryGap: false,
       axisLine: { lineStyle: { color: '#e2e8f0' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10.5, hideOverlap: true, interval: mob ? 'auto' : Math.ceil(N / 8) - 1 },
+      axisLabel: { color: '#94a3b8', fontSize: 10.5, hideOverlap: true, interval: 'auto' },
       axisTick: { show: false }
     },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, start: zoom.start, end: zoom.end, minValueSpan: 5 }
+    ],
     yAxis: {
       type: 'value', scale: true, name: '亿元', nameTextStyle: { color: '#cbd5e1', fontSize: 10 },
       axisLabel: { color: '#94a3b8', fontSize: 10.5 },
@@ -307,6 +383,74 @@
       }
     }]
   });
+
+  // ---- 区间联动 + 纵轴自适应 ----
+  function refreshY() {
+    var f1 = fitArr(tv, true), f2 = fitArr(cl, false), f3 = fitArr(mv, false);
+    var y1 = [];
+    if (f1) y1.push({ min: f1.min, max: f1.max }); else y1.push({});
+    if (f2) y1.push({ min: f2.min, max: f2.max }); else y1.push({});
+    c1.setOption({ yAxis: y1 });
+    if (f3) c3.setOption({ yAxis: { min: f3.min, max: f3.max } });
+  }
+
+  function syncFrom(src) {
+    if (syncing) return;
+    var dz = src.getOption().dataZoom[0];
+    if (!dz) return;
+    zoom = { start: dz.start, end: dz.end };
+    syncing = true;
+    c1.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    c3.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    syncing = false;
+    refreshY();
+  }
+
+  c1.on('dataZoom', function () { syncFrom(c1); });
+  c3.on('dataZoom', function () { syncFrom(c3); });
+  refreshY();
+
+  // ---- 快捷区间 ----
+  var curWin = 20;
+
+  function applyWin(days) {
+    var st = (!days || days >= N) ? 0 : Math.max(0, N - days) / Math.max(N - 1, 1) * 100;
+    zoom = { start: st, end: 100 };
+    syncing = true;
+    c1.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    c3.dispatchAction({ type: 'dataZoom', start: zoom.start, end: zoom.end });
+    syncing = false;
+    refreshY();
+    markWin();
+  }
+
+  function markWin() {
+    var r = visRange();
+    var days = r[1] - r[0] + 1;
+    var hit = days >= N - 2 ? 0 : -1;
+    if (hit !== 0) {
+      [250, 60, 20].forEach(function (c) {
+        if (hit === -1 && Math.abs(days - c) <= Math.max(2, c * 0.08)) { hit = c; }
+      });
+    }
+    curWin = hit;
+    document.querySelectorAll('[data-w]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.w === String(curWin));
+    });
+    var el = document.getElementById('mkInfo');
+    if (el) {
+      el.innerHTML = '<b>' + dates[r[0]] + '</b> ~ <b>' + dates[r[1]] + '</b>　' + days + ' 个交易日';
+    }
+  }
+
+  document.querySelectorAll('[data-w]').forEach(function (b) {
+    b.addEventListener('click', function () { applyWin(Number(b.dataset.w)); });
+  });
+
+  var _sync = syncFrom;
+  syncFrom = function (src) { _sync(src); markWin(); };
+
+  markWin();
 
   var rt = null;
   window.addEventListener('resize', function () {
