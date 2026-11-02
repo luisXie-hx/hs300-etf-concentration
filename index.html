@@ -104,6 +104,21 @@
   .tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;background:#eff6ff;color:var(--blue);margin-left:6px;font-weight:600}
   .bar{display:inline-block;height:6px;border-radius:3px;background:var(--blue-l);vertical-align:middle;margin-right:6px}
 
+  /* 长期收益对比表 */
+  .tri-wrap{margin-top:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #triTbl{min-width:520px;font-size:12.5px}
+  #triTbl th,#triTbl td{padding:7px 9px;white-space:nowrap}
+  #triTbl th:first-child,#triTbl td:first-child{
+    text-align:left;font-weight:600;color:var(--ink2);position:sticky;left:0;background:#fff;
+    padding-right:14px;
+  }
+  #triTbl thead th{font-size:11px;color:var(--ink3);font-weight:600}
+  #triTbl tbody td{font-variant-numeric:tabular-nums}
+  #triTbl .ytd{color:var(--ink3);font-weight:400}
+  #triTbl tr:last-child td{border-bottom:none}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:1px}
+  .tri-hint{display:none;font-size:11px;color:var(--ink3);text-align:center;margin:2px 0 6px}
+
   .note{font-size:12.5px;color:var(--ink2);line-height:1.85}
   .note h3{font-size:13px;color:var(--ink);margin:14px 0 6px}
   .note h3:first-child{margin-top:0}
@@ -176,6 +191,7 @@
     .note ul{padding-left:16px}
     .warn{font-size:11.8px;padding:10px 12px}
     footer{font-size:10.5px}
+    .tri-hint{display:block}
   }
 </style>
 </head>
@@ -288,6 +304,19 @@
     </table>
   </section>
 
+  <section class="card" id="triCard" style="display:none">
+    <h2>长期收益对比：沪深300全收益 vs 债券基金</h2>
+    <div class="cap" id="triCap">—</div>
+    <div id="chartTri" class="chart"></div>
+    <div class="tri-hint">← 表格可左右滑动 →</div>
+    <div class="tri-wrap">
+      <table id="triTbl">
+        <thead><tr><th>年份</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="card note">
     <h3>这个指标在测什么</h3>
     <ul>
@@ -313,6 +342,7 @@
       <li><b>沪市 ETF 份额</b>：上海证券交易所每日披露的 ETF 总份额（TOT_VOL），真实日频，与基金季报期末份额完全对得上。</li>
       <li><b>深市 ETF 份额</b>：交易所不提供历史日频序列，采用基金季报「期末总份额」为锚点，锚点之间按交易日线性插值，末端锚点为当日实时份额。</li>
       <li><b>沪深300指数</b>：东方财富日线收盘价。</li>
+      <li><b>长期收益对比</b>：沪深300全收益（H00300.CSI）与中证债券型基金指数（H11023）均取自中证指数官网，日频。债券一端是 Wind「万得混合债券型二级指数」(885007.WI) 的免费替代——后者无公开接口，H11023 口径更宽、含纯债基金，两者<b>不是严格同口径</b>。</li>
       <li>深市份额约占全市场 12%–15%，且其变动方向与沪市头部高度同步，插值对占比曲线的影响约在 1 个百分点以内。</li>
     </ul>
   </section>
@@ -870,6 +900,107 @@
       '截至 ' + D.dates[last] + '　全部沪深300ETF 合计 ' + num(D.total[last]) + ' 亿份　共 ' + rows.length + ' 只';
   }
 
+  // ---- 长期收益对比 ----
+  var chartTri = null;
+  function renderTri() {
+    var T = D.tri;
+    if (!T || !T.dates || !T.dates.length) return;
+    var card = document.getElementById('triCard');
+    if (card) card.style.display = '';
+    if (!chartTri) chartTri = echarts.init(document.getElementById('chartTri'));
+
+    var mob = window.innerWidth < 640;
+    var lastD = T.dates[T.dates.length - 1];
+    document.getElementById('triCap').textContent =
+      '以 ' + T.base + ' 收盘 = 1000 归一化，均含分红再投资　·　截至 ' + lastD;
+
+    // 年度收益表
+    var head = document.querySelector('#triTbl thead tr');
+    var tbody = document.querySelector('#triTbl tbody');
+    head.innerHTML = '<th>年份</th>' + T.yearly.map(function (r, i) {
+      return '<th>' + r.y + (i === T.yearly.length - 1 ? '<span class="ytd">*</span>' : '') + '</th>';
+    }).join('');
+    var fmtP = function (v) {
+      if (v === null || v === undefined) return '<span style="color:#cbd5e1">—</span>';
+      return '<span class="' + (v >= 0 ? 'up' : 'down') + '">' +
+        (v >= 0 ? '+' : '') + v.toFixed(1) + '%</span>';
+    };
+    tbody.innerHTML =
+      '<tr><td><span class="dot" style="background:#1d4ed8"></span>沪深300全收益</td>' +
+      T.yearly.map(function (r) { return '<td>' + fmtP(r.hs) + '</td>'; }).join('') + '</tr>' +
+      '<tr><td><span class="dot" style="background:#7c3aed"></span>中证债券型基金</td>' +
+      T.yearly.map(function (r) { return '<td>' + fmtP(r.bond) + '</td>'; }).join('') + '</tr>';
+
+    var all = T.hs.concat(T.bond);
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var pad = Math.max((hi - lo) * 0.08, 20);
+    // 让刻度等距：先定步长，再由步长推出上下界
+    var step = Math.ceil((hi + pad - lo) / 6 / 50) * 50;
+    var yMin = Math.floor(lo / 50) * 50;
+    var yMax = yMin + step * Math.ceil((hi + pad - yMin) / step);
+
+    chartTri.setOption({
+      grid: { left: mob ? 44 : 58, right: mob ? 48 : 62, top: 40, bottom: 30 },
+      legend: {
+        top: 2, left: 0, itemWidth: 12, itemHeight: 8, itemGap: 16,
+        textStyle: { color: '#475569', fontSize: 11.5 }
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: '#cbd5e1', type: 'dashed' } },
+        backgroundColor: 'rgba(255,255,255,.98)',
+        borderColor: '#e2e8f0', borderWidth: 1, padding: [8, 10],
+        textStyle: { color: '#0f172a', fontSize: 12 },
+        formatter: function (ps) {
+          var s = '<div style="font-size:11px;color:#94a3b8;margin-bottom:5px">' +
+            ps[0].axisValue + '</div>';
+          ps.forEach(function (p) {
+            var v = p.value, chg = (v / 1000 - 1) * 100;
+            s += '<div style="display:flex;gap:14px;justify-content:space-between;line-height:1.7">' +
+              '<span>' + p.marker + p.seriesName + '</span>' +
+              '<b style="font-variant-numeric:tabular-nums">' + v.toFixed(0) +
+              ' <span style="color:' + (chg >= 0 ? '#dc2626' : '#059669') + ';font-weight:600">' +
+              (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%</span></b></div>';
+          });
+          return s;
+        }
+      },
+      xAxis: {
+        type: 'category', data: T.dates, boundaryGap: false,
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true }
+      },
+      yAxis: {
+        type: 'value', min: yMin, max: yMax, interval: step,
+        axisLabel: { color: '#94a3b8', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#f1f5f9' } }
+      },
+      series: [
+        {
+          name: '沪深300全收益', type: 'line', data: T.hs,
+          symbol: 'none', smooth: false,
+          lineStyle: { width: 2, color: '#1d4ed8' },
+          itemStyle: { color: '#1d4ed8' },
+          endLabel: {
+            show: true, color: '#1d4ed8', fontSize: 11, fontWeight: 600, offset: [3, 0],
+            formatter: function (p) { return p.value.toFixed(0); }
+          }
+        },
+        {
+          name: '中证债券型基金', type: 'line', data: T.bond,
+          symbol: 'none', smooth: false,
+          lineStyle: { width: 2, color: '#7c3aed' },
+          itemStyle: { color: '#7c3aed' },
+          endLabel: {
+            show: true, color: '#7c3aed', fontSize: 11, fontWeight: 600, offset: [3, 0],
+            formatter: function (p) { return p.value.toFixed(0); }
+          }
+        }
+      ]
+    }, true);
+  }
+
   // ---- 区间联动 ----
   function updateZoomInfo() {
     var r = visIdx();
@@ -1002,6 +1133,7 @@
   render();
   renderStack();
   renderTable();
+  renderTri();
   renderSummary();
   renderSentiment();
   updateZoomInfo();
@@ -1014,6 +1146,7 @@
       renderStack();
       chartMain.resize();
       chartStack.resize();
+      if (chartTri) { renderTri(); chartTri.resize(); }
     }, 180);
   });
 

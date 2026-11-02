@@ -38,6 +38,7 @@ jobs:
           python scripts/fetch_snapshot.py
           python scripts/fetch_market.py
           python scripts/build_market.py
+          python scripts/fetch_tri.py || echo "长期对比抓取失败，沿用已有数据"
           python scripts/build_dataset.py
           python scripts/export_web.py
 
